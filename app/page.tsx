@@ -1,101 +1,190 @@
-import Image from "next/image";
+"use client";
+import axios from 'axios';
+import React, { useEffect, useState } from 'react';
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface Seat {
+  seat_id: number;
+  booked: boolean;
+  user_id: null | number;
+  status: 'available' | 'booked';
 }
+
+interface SeatFromAPI {
+  seat_id: number;
+  booked: boolean;
+  user_id: null | number;
+}
+
+const Home: React.FC = () => {
+  const [seats, setSeats] = useState<Seat[]>([]);
+  const [numSeats, setNumSeats] = useState<number | "">("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchSeats();
+  }, []);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL
+  // Fetch seats from the API
+  const fetchSeats = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/bookings/view`);
+      const formattedSeats: Seat[] = response.data.map((seat: SeatFromAPI) => ({
+        ...seat,
+        status: seat.booked ? 'booked' : 'available', // Dynamically add status based on booked field
+      }));
+      setSeats(formattedSeats);
+      return formattedSeats;
+    } catch (error) {
+      console.error('Error fetching seats:', error);
+      return [];
+    }
+  };
+
+  const bookSeats = async () => {
+    if (!numSeats || numSeats <= 0) return alert('Please enter a valid number of seats to book');
+
+    setLoading(true);
+    try {
+      const updatedSeats: Seat[] = await fetchSeats();
+      const totalSeats = updatedSeats.length;
+      const seatsPerRow = 7;
+
+      if (updatedSeats.filter(seat => !seat.booked).length < numSeats) {
+        alert('Not enough available seats.');
+        return;
+      }
+
+      // Create an array of rows
+      const rows: Seat[][] = [];
+      for (let i = 0; i < totalSeats; i += seatsPerRow) {
+        rows.push(updatedSeats.slice(i, i + seatsPerRow));
+      }
+
+      let seatsToBook: Seat[] = [];
+
+      // Find the first row with enough consecutive seats
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        const currentRow = rows[rowIndex];
+        let consecutiveCount = 0;
+        let startIndex = -1;
+
+        // Count consecutive available seats in the current row
+        for (let i = 0; i < currentRow.length; i++) {
+          if (!currentRow[i].booked) {
+            if (consecutiveCount === 0) startIndex = i;
+            consecutiveCount++;
+            
+            if (consecutiveCount === numSeats) {
+              // Check if these seats would cross row boundary
+              if (startIndex + numSeats <= seatsPerRow) {
+                // Found enough consecutive seats in this row
+                seatsToBook = currentRow.slice(startIndex, startIndex + numSeats);
+                break;
+              }
+            }
+          } else {
+            consecutiveCount = 0;
+            startIndex = -1;
+          }
+        }
+
+        // If we haven't found enough consecutive seats and we're at the start of a new row
+        if (seatsToBook.length === 0 && consecutiveCount >= numSeats) {
+          seatsToBook = currentRow.slice(startIndex, startIndex + numSeats);
+        }
+
+        if (seatsToBook.length === numSeats) break;
+      }
+
+      // If we couldn't find consecutive seats in any row
+      if (seatsToBook.length < numSeats) {
+        alert('Unable to find enough consecutive seats in a single row.');
+        return;
+      }
+
+      // Extract seat IDs to book
+      const selectedSeatIds = seatsToBook.map((seat) => seat.seat_id);
+
+      // Send booking request to backend
+      const response = await axios.post(`${API_URL}/api/bookings/reserve`, {
+        seatIds: selectedSeatIds,
+      });
+
+      alert(response.data.message);
+      const updatedSeatsAfterBooking = await fetchSeats();
+      setSeats([...updatedSeatsAfterBooking]);
+
+    } catch (error) {
+      console.error('Error booking seats:', error);
+      alert('Failed to book seats');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // Reset all seats
+  const resetAllSeats = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/api/bookings/reset`);
+      alert(response.data.message);
+      fetchSeats();
+    } catch (error) {
+      console.error('Error resetting seats:', error);
+      alert('Failed to reset seats');
+    }
+  };
+
+  return (
+    <main className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <h1 className="text-2xl text-black font-bold mb-4">Ticket Booking</h1>
+      <div className="grid grid-cols-7 gap-2 mb-6">
+        {seats.map((seat, index) => (
+          <div
+            key={index} // Use index as a temporary key
+            className={`w-8 h-8 flex items-center justify-center rounded ${
+              seat.status === 'available' ? 'bg-green-500' : 'bg-yellow-500'
+            } text-white`}
+          >
+            {seat.seat_id}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center space-x-2 mb-4">
+        <input
+          type="number"
+          value={numSeats}
+          onChange={(e) => setNumSeats(Number(e.target.value))}
+          className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Enter number of seats"
+        />
+        <button
+          onClick={bookSeats}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+        >
+          {loading ? 'Booking...' : 'Book'}
+        </button>
+      </div>
+
+      <div className="mt-4">
+        <span className="mr-4 text-black">
+          Booked Seats: {seats.filter((seat) => seat.status === 'booked').length}
+        </span>
+        <span className="text-black">
+          Available Seats: {seats.filter((seat) => seat.status === 'available').length}
+        </span>
+      </div>
+
+      <button
+        onClick={resetAllSeats}
+        className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 mt-4"
+      >
+        Reset All Seats
+      </button>
+    </main>
+  );
+};
+
+export default Home;
