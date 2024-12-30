@@ -23,8 +23,7 @@ const Home: React.FC = () => {
   useEffect(() => {
     fetchSeats();
   }, []);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL
-  // Fetch seats from the API
+  const API_URL = 'https://train-pb2l.onrender.com'
   const fetchSeats = async () => {
     try {
       const response = await axios.get(`${API_URL}/api/bookings/view`);
