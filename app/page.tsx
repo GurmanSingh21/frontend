@@ -155,7 +155,7 @@ const Home: React.FC = () => {
           type="number"
           value={numSeats}
           onChange={(e) => setNumSeats(Number(e.target.value))}
-          className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="p-2 text-black border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="Enter number of seats"
         />
         <button
